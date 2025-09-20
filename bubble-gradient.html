@@ -6,7 +6,7 @@
   </head>
   <body style="height: 100%; margin: 0">
     <p>Start audio to play animation: </p>
-    <audio preload id="apple" style="width: 480px;" class="hidden" src="./bad_apple.opus" controls></audio>
+    <audio preload="auto" id="apple" style="width: 480px;" class="hidden" src="./bad_apple.opus" controls></audio>
     <div id="container" style="height: 360px; width: 480px"></div>
     <div id="debug"><div>
     <script
@@ -59,7 +59,7 @@
       let playing = false;
       const audio = document.getElementById("apple");
       const debug = document.getElementById("debug");
-      audio.addEventListener('play', function() {
+      audio.addEventListener('playing', function() {
         if(!playing) {
           playing = true;
           animate();
