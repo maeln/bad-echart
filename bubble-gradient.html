@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en" style="height: 100%">
+  <head>
+    <meta charset="utf-8" />
+  </head>
+  <body style="height: 100%; margin: 0">
+    <audio id="apple" src="./bad_apple.opus"></audio>
+    <div id="container" style="height: 360px; width: 480px"></div>
+    <div id="debug"><div>
+    <script
+      type="text/javascript"
+      src="https://fastly.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"
+    ></script>
+    <script type="text/javascript">
+      const dom = document.getElementById("container");
+      const myChart = echarts.init(dom, null, {
+        renderer: "canvas",
+        useDirtyRect: false,
+      });
+      var app = {};
+      const option = {
+        animation: false,
+        backgroundColor: "black",
+        title: {
+          text: "Life Expectancy and GDP by Country",
+        },
+        xAxis: {
+          splitLine: false,
+          min: 0,
+          max: 480,
+        },
+        yAxis: {
+          splitLine: false,
+          min: 0,
+          max: 360,
+        },
+        series: [
+          {
+            animation: false,
+            data: [],
+            type: "scatter",
+            symbolSize: function (data) {
+              return data[2];
+            },
+            itemStyle: {
+              color: "white",
+              opacity: 0.8,
+            },
+          },
+        ],
+      };
+      myChart.setOption(option);
+
+      let currFrame = 0;
+      let frames = [];
+      let lrt = 0;
+      const audio = document.getElementById("apple");
+      const debug = document.getElementById("debug");
+
+      const debby = () => {
+        let msg = `frame ${currFrame}/${frames.length}, lrt: ${lrt}`;
+        debug.innerHTML = msg;
+      }
+
+      const load = async () => {
+        const response = await fetch("./frames.json");
+        const fr = await response.json();
+        frames = fr;
+        animate();
+      };
+
+      const updateFrame = () => {
+        option.series[0].data = frames[currFrame];
+        myChart.setOption(option);
+        currFrame++;
+      };
+
+      const playFrame = () => {
+        setTimeout(() => {
+          const start = performance.now();
+          updateFrame();
+          // debby();
+          if (currFrame < frames.length) {
+            playFrame();
+          }
+          const end = performance.now();
+          lrt = end-start;
+        }, 71.43-lrt);
+      };
+
+      const animate = () => {
+        updateFrame();
+        audio.play();
+        playFrame();
+      };
+
+      load();
+    </script>
+  </body>
+</html>
