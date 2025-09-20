@@ -4,7 +4,8 @@
     <meta charset="utf-8" />
   </head>
   <body style="height: 100%; margin: 0">
-    <audio id="apple" src="./bad_apple.opus"></audio>
+    <p>Start audio to play animation: </p>
+    <audio id="apple" style="width: 480px;" src="./bad_apple.opus" controls></audio>
     <div id="container" style="height: 360px; width: 480px"></div>
     <div id="debug"><div>
     <script
@@ -56,7 +57,9 @@
       let lrt = 0;
       const audio = document.getElementById("apple");
       const debug = document.getElementById("debug");
-
+      audio.addEventListener('play', function() {
+        animate();
+      });
       const debby = () => {
         let msg = `frame ${currFrame}/${frames.length}, lrt: ${lrt}`;
         debug.innerHTML = msg;
@@ -66,7 +69,6 @@
         const response = await fetch("./frames.json");
         const fr = await response.json();
         frames = fr;
-        animate();
       };
 
       const updateFrame = () => {
