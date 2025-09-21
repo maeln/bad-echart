@@ -11,7 +11,7 @@ use rand::seq::IteratorRandom;
 use rand::{Rng, SeedableRng};
 use rayon::iter::{IntoParallelRefIterator, ParallelBridge, ParallelIterator};
 
-const MAX_RADIUS: u32 = 23;
+const MAX_RADIUS: u32 = 25;
 
 #[derive(Debug, Clone)]
 struct Circle {
@@ -96,7 +96,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let coord = first_pass_pixels.iter().next().unwrap().clone();
         first_pass_pixels.remove(&coord);
         let circle = find_biggest_circle(&mask, coord.0, coord.1, MAX_RADIUS);
-        if circle.r < MAX_RADIUS {
+        if circle.r < 2 {
             continue;
         }
         let to_rm = pixels_in_circle(circle.x, circle.y, circle.r);
@@ -131,22 +131,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //             second_pass_mask.remove(p);
     //         });
     // }
-    if args.debug {
-        debug_img(&mask, img.width(), img.height(), "mask.bmp").expect("could not save debug img");
-    }
-    while second_pass_pixels.len() > 0 {
-        let coord = second_pass_pixels.iter().next().unwrap().clone();
-        second_pass_pixels.remove(&coord);
-        let circle = find_biggest_circle(&mask, coord.0, coord.1, MAX_RADIUS);
-        if circle.r < 2 {
-            continue;
-        }
-        let to_rm = pixels_in_circle(circle.x, circle.y, circle.r);
-        circles.push(circle);
-        for px in to_rm {
-            mask.remove(&px);
-        }
-    }
+    // if args.debug {
+    //     debug_img(&mask, img.width(), img.height(), "mask.bmp").expect("could not save debug img");
+    // }
+    // while second_pass_pixels.len() > 0 {
+    //     let coord = second_pass_pixels.iter().next().unwrap().clone();
+    //     second_pass_pixels.remove(&coord);
+    //     let circle = find_biggest_circle(&mask, coord.0, coord.1, MAX_RADIUS);
+    //     if circle.r < 2 {
+    //         continue;
+    //     }
+    //     let to_rm = pixels_in_circle(circle.x, circle.y, circle.r);
+    //     circles.push(circle);
+    //     for px in to_rm {
+    //         mask.remove(&px);
+    //     }
+    // }
 
     if args.debug {
         let circle_px: HashSet<(u32, u32)> = circles
