@@ -4,14 +4,14 @@ use std::{
     path::PathBuf,
 };
 
-use bpaf::{Parser, positional};
-use image::{DynamicImage, GenericImageView};
+use bpaf::{Parser, construct, positional, short};
+use image::{DynamicImage, GenericImageView, ImageBuffer, Rgb, RgbImage};
 use rand::rngs::StdRng;
 use rand::seq::IteratorRandom;
 use rand::{Rng, SeedableRng};
 use rayon::iter::{IntoParallelRefIterator, ParallelBridge, ParallelIterator};
 
-const MAX_RADIUS: u32 = 25;
+const MAX_RADIUS: u32 = 23;
 
 #[derive(Debug, Clone)]
 struct Circle {
@@ -34,13 +34,42 @@ fn calculate_luminance(r: u8, g: u8, b: u8) -> f32 {
     0.299 * r_norm + 0.587 * g_norm + 0.114 * b_norm
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let path = positional::<PathBuf>("IMG")
-        .help("frame to analyze")
-        .to_options()
-        .run();
+fn debug_img(
+    pixel_set: &HashSet<(u32, u32)>,
+    width: u32,
+    height: u32,
+    filename: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut img: RgbImage = ImageBuffer::new(width, height);
+    for pixel in img.pixels_mut() {
+        *pixel = Rgb([0, 0, 0]); // Black color
+    }
+    for &(x, y) in pixel_set {
+        if x < width && y < height {
+            img.put_pixel(x, y, Rgb([255, 255, 255]));
+        }
+    }
+    img.save(filename)?;
+    Ok(())
+}
 
-    let img = image::open(&path)?;
+struct Args {
+    path: PathBuf,
+    debug: bool,
+}
+
+fn parse_args() -> Args {
+    let path = positional::<PathBuf>("IMG").help("frame to analyze");
+    let debug = short('d')
+        .long("debug")
+        .help("activate debug mode: output the mask and pass images.")
+        .switch();
+    construct!(Args { path, debug }).to_options().run()
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = parse_args();
+    let img = image::open(&args.path)?;
 
     let targets_pixels: HashSet<(u32, u32)> = (0..(img.width() * img.height()))
         .map(|d1| (d1 % img.width(), d1 / img.width()))
@@ -52,48 +81,86 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .collect();
 
+    if args.debug {
+        debug_img(&targets_pixels, img.width(), img.height(), "targets.bmp")
+            .expect("could not save debug img");
+    }
+
     let mut circles: Vec<Circle> = Vec::new();
     let mut first_pass_pixels = targets_pixels.clone();
     let mut second_pass_pixels = targets_pixels.clone();
-    let mut second_pass_mask = first_pass_pixels.clone();
+    let mut mask = targets_pixels.clone();
 
     // First pass: We only care about fitting as many big circle as possible
     while first_pass_pixels.len() > 0 {
         let coord = first_pass_pixels.iter().next().unwrap().clone();
         first_pass_pixels.remove(&coord);
-        let circle = find_biggest_circle(&targets_pixels, coord.0, coord.1);
+        let circle = find_biggest_circle(&mask, coord.0, coord.1, MAX_RADIUS);
         if circle.r < MAX_RADIUS {
             continue;
         }
         let to_rm = pixels_in_circle(circle.x, circle.y, circle.r);
         circles.push(circle);
         for px in to_rm {
-            first_pass_pixels.remove(&px);
+            mask.remove(&px);
         }
+    }
+
+    if args.debug {
+        let circle_px: HashSet<(u32, u32)> = circles
+            .iter()
+            .map(|e| pixels_in_circle(e.x, e.y, e.r))
+            .reduce(|mut acc, e| {
+                acc.extend(e);
+                return acc;
+            })
+            .unwrap()
+            .into_iter()
+            .collect();
+        debug_img(&circle_px, img.width(), img.height(), "fist_pass.bmp")
+            .expect("could not save debug img");
     }
 
     // Second pass: We make a new image from the first with the circles
     // of the first pass removed, but we make them a bit smaller to allow for some overlap
     // and we again find circles
-    for circle in circles.iter() {
-        pixels_in_circle(circle.x, circle.y, circle.r - 2)
-            .iter()
-            .for_each(|p| {
-                second_pass_mask.remove(p);
-            });
+    // for circle in circles.iter() {
+    //     pixels_in_circle(circle.x, circle.y, circle.r)
+    //         .iter()
+    //         .for_each(|p| {
+    //             second_pass_mask.remove(p);
+    //         });
+    // }
+    if args.debug {
+        debug_img(&mask, img.width(), img.height(), "mask.bmp").expect("could not save debug img");
     }
     while second_pass_pixels.len() > 0 {
         let coord = second_pass_pixels.iter().next().unwrap().clone();
         second_pass_pixels.remove(&coord);
-        let circle = find_biggest_circle(&second_pass_mask, coord.0, coord.1);
+        let circle = find_biggest_circle(&mask, coord.0, coord.1, MAX_RADIUS);
         if circle.r < 2 {
             continue;
         }
         let to_rm = pixels_in_circle(circle.x, circle.y, circle.r);
         circles.push(circle);
         for px in to_rm {
-            second_pass_mask.remove(&px);
+            mask.remove(&px);
         }
+    }
+
+    if args.debug {
+        let circle_px: HashSet<(u32, u32)> = circles
+            .iter()
+            .map(|e| pixels_in_circle(e.x, e.y, e.r))
+            .reduce(|mut acc, e| {
+                acc.extend(e);
+                return acc;
+            })
+            .unwrap()
+            .into_iter()
+            .collect();
+        debug_img(&circle_px, img.width(), img.height(), "output.bmp")
+            .expect("could not save debug img");
     }
 
     // Output the circles.
@@ -113,9 +180,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn find_biggest_circle(valid_px: &HashSet<(u32, u32)>, cx: u32, cy: u32) -> Circle {
+fn find_biggest_circle(
+    valid_px: &HashSet<(u32, u32)>,
+    cx: u32,
+    cy: u32,
+    max_radius: u32,
+) -> Circle {
     let mut circle = Circle { x: cx, y: cy, r: 1 };
-    for r in 3..=MAX_RADIUS {
+    for r in 3..=max_radius {
         let valid = check_circle(valid_px, cx, cy, r);
         if !valid {
             break;

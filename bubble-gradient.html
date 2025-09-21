@@ -7,7 +7,7 @@
   <body style="height: 100%; margin: 0">
     <p>Start audio to play animation: </p>
     <audio preload="auto" id="apple" style="width: 480px;" class="hidden" src="./bad_apple.opus" controls></audio>
-    <div id="container" style="height: 360px; width: 480px"></div>
+    <div id="container" style="height: 440px; width: 540px"></div>
     <div id="debug"><div>
     <script
       type="text/javascript"
@@ -36,17 +36,25 @@
           min: 0,
           max: 360,
         },
+        grid: {
+          left: 40,
+          right: 20,
+          top: 40,
+          bottom: 40,
+          width: 480,
+          height: 360
+        },
         series: [
           {
             animation: false,
             data: [],
             type: "scatter",
             symbolSize: function (data) {
-              return data[2];
+              return data[2]*2;
             },
             itemStyle: {
               color: "white",
-              opacity: 0.8,
+              opacity: 1,
             },
           },
         ],
